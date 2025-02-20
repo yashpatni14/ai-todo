@@ -1,7 +1,5 @@
 {% extends 'base.html' %}
 
-{% load custom_filters %}
-
 {% block content %}
 <div class="row">
     <!-- Task List Section -->
@@ -67,17 +65,12 @@
                 <h6>Task Statistics</h6>
                 <div class="mb-3">
                     <div class="progress mb-2" style="height: 20px;">
-                        <div class="progress-bar bg-success" 
-                            style="width: {% if total_tasks %}
-                                        {{ completed_tasks|divideby:total_tasks|multiply:100|floatformat:0 }}
-                                    {% else %}
-                                        0
-                                    {% endif %}%">
-                            {{ completed_tasks }} Completed
+                        <div id="progress-bar" class="progress-bar bg-success" style="width: 0%;">
+                            0 Completed
                         </div>
-                    </div>
+                    </div>                                       
                     <small class="text-muted">
-                        {{ completed_tasks }}/{{ total_tasks }} tasks completed
+                        <span id="progress-text">0</span>/{{ total_tasks }} tasks completed
                     </small>
                 </div>
 
@@ -94,4 +87,44 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        function updateProgressBar() {
+            let completedTasks = parseInt("{{ completed_tasks|default:0 }}");
+            let totalTasks = parseInt("{{ total_tasks|default:0 }}");
+            let percentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+            let progressBar = document.getElementById("progress-bar");
+            let progressText = document.getElementById("progress-text");
+
+            progressBar.style.width = percentage + "%";
+            progressBar.innerText = completedTasks + " Completed";
+            progressText.innerText = completedTasks;
+        }
+
+        updateProgressBar(); // Call function on page load
+
+        // Add event listener to detect task completion toggle
+        document.querySelectorAll(".task-toggle-btn").forEach(button => {
+            button.addEventListener("click", function(event) {
+                event.preventDefault(); // Prevent page reload
+                let taskId = this.getAttribute("data-task-id");
+
+                fetch(`/toggle-task/${taskId}/`, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}",
+                        "Content-Type": "application/json"
+                    }
+                }).then(response => response.json())
+                  .then(data => {
+                      if (data.success) {
+                          updateProgressBar(); // Update progress bar dynamically
+                      }
+                  });
+            });
+        });
+    });
+</script>
 {% endblock %}
