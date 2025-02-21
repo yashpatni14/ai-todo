@@ -7,6 +7,9 @@ from .models import Task
 from .forms import TaskForm
 from .ai_utils import get_task_priority
 from django.db.models import Count
+from django.utils.timezone import now
+from django.core.exceptions import ValidationError
+from django.contrib import messages
 
 
 def register(request):
@@ -66,20 +69,41 @@ def task_list(request):
     return render(request, 'todos/task_list.html', context)
 
 
+# @login_required
+# def task_create(request):
+#     """Creates a new task."""
+#     if request.method == 'POST':
+#         form = TaskForm(request.POST)
+#         if form.is_valid():
+#             task = form.save(commit=False)
+#             task.user = request.user
+            
+#             # Get AI priority suggestion
+#             priority_data = get_task_priority(task.title, task.description, task.deadline)
+#             task.ai_priority = priority_data['priority']
+#             task.ai_score = priority_data['score']
+            
+#             task.save()
+#             return redirect('task_list')
+#     else:
+#         form = TaskForm()
+#     return render(request, 'todos/task_form.html', {'form': form})
+
 @login_required
 def task_create(request):
-    """Creates a new task."""
     if request.method == 'POST':
         form = TaskForm(request.POST)
         if form.is_valid():
             task = form.save(commit=False)
             task.user = request.user
             
-            # Get AI priority suggestion
+            if task.deadline and task.deadline < now():
+                messages.error(request, "You cannot select a past date and time.")
+                return render(request, 'todos/task_form.html', {'form': form})
+
             priority_data = get_task_priority(task.title, task.description, task.deadline)
             task.ai_priority = priority_data['priority']
             task.ai_score = priority_data['score']
-            
             task.save()
             return redirect('task_list')
     else:
@@ -87,24 +111,50 @@ def task_create(request):
     return render(request, 'todos/task_form.html', {'form': form})
 
 
+# @login_required
+# def task_update(request, pk):
+#     """Updates an existing task."""
+#     task = get_object_or_404(Task, pk=pk, user=request.user)
+#     if request.method == 'POST':
+#         form = TaskForm(request.POST, instance=task)
+#         if form.is_valid():
+#             task = form.save(commit=False)
+            
+#             # Update AI priority suggestion
+#             priority_data = get_task_priority(task.title, task.description, task.deadline)
+#             task.ai_priority = priority_data['priority']
+#             task.ai_score = priority_data['score']
+            
+#             task.save()
+#             return redirect('task_list')
+#     else:
+#         form = TaskForm(instance=task)
+#     return render(request, 'todos/task_form.html', {'form': form})
+
 @login_required
 def task_update(request, pk):
     """Updates an existing task."""
     task = get_object_or_404(Task, pk=pk, user=request.user)
+    
     if request.method == 'POST':
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
-            task = form.save(commit=False)
-            
+            updated_task = form.save(commit=False)
+
+            if updated_task.deadline and updated_task.deadline < now():
+                messages.error(request, "You cannot select a past date and time.")
+                return render(request, 'todos/task_form.html', {'form': form})
+
             # Update AI priority suggestion
-            priority_data = get_task_priority(task.title, task.description, task.deadline)
-            task.ai_priority = priority_data['priority']
-            task.ai_score = priority_data['score']
+            priority_data = get_task_priority(updated_task.title, updated_task.description, updated_task.deadline)
+            updated_task.ai_priority = priority_data['priority']
+            updated_task.ai_score = priority_data['score']
             
-            task.save()
+            updated_task.save()
             return redirect('task_list')
     else:
         form = TaskForm(instance=task)
+    
     return render(request, 'todos/task_form.html', {'form': form})
 
 
